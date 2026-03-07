@@ -1,0 +1,43 @@
+# model_config.yaml
+# ------------------
+# Hyperparamètres du modèle MMM bayésien
+
+model:
+  name: "mmm_multi_market_bayesian"
+  version: "1.0.0"
+
+inference:
+  draws: 1000
+  tune: 1000
+  chains: 4
+  target_accept: 0.9
+  random_seed: 42
+
+channels:
+  - name: tv
+    adstock_type: geometric       # geometric | delayed
+    saturation_type: hill         # hill | logistic
+    decay_prior: [0.3, 0.7]       # [min, max] pour prior uniform
+    
+  - name: facebook
+    adstock_type: geometric
+    saturation_type: hill
+    decay_prior: [0.1, 0.5]
+    
+  - name: search
+    adstock_type: geometric
+    saturation_type: hill
+    decay_prior: [0.0, 0.3]
+    
+  - name: ooh
+    adstock_type: geometric
+    saturation_type: hill
+    decay_prior: [0.2, 0.6]
+    
+  - name: print
+    adstock_type: geometric
+    saturation_type: hill
+    decay_prior: [0.1, 0.4]
+
+target: revenue
+date_column: date

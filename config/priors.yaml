@@ -1,0 +1,36 @@
+# priors.yaml
+# -----------
+# Distributions a priori pour le modèle bayésien
+# Basées sur la littérature MMM (Jin et al. 2017, Gelman 2020)
+
+channel_coefficients:
+  distribution: HalfNormal
+  sigma: 1.0
+  description: "Prior faiblement informatif pour les betas"
+
+adstock_decay:
+  distribution: Beta
+  alpha: 2.0
+  beta: 2.0
+  description: "Prior centré sur 0.5, borné [0,1]"
+
+hill_k:  # half-saturation point
+  distribution: Gamma
+  alpha: 3.0
+  beta: 1.0
+  description: "Prior pour le point de demi-saturation"
+
+hill_s:  # shape parameter
+  distribution: Gamma
+  alpha: 2.0
+  beta: 1.0
+  description: "Prior pour la forme de la courbe Hill"
+
+base_sales:
+  distribution: Normal
+  description: "Prior sur les ventes de base (non-marketing)"
+
+noise:
+  distribution: HalfNormal
+  sigma: 0.5
+  description: "Prior sur l'écart-type du bruit"

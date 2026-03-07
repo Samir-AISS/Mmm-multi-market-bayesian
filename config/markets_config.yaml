@@ -1,0 +1,94 @@
+# markets_config.yaml
+# -------------------
+# Paramètres spécifiques par marché
+
+markets:
+  FR:
+    name: "France"
+    gdp_index: 1.00
+    digital_maturity: 0.85
+    tv_dominance: 0.70
+    seasonality_type: standard
+    base_sales: 850000
+    currency: EUR
+
+  DE:
+    name: "Germany"
+    gdp_index: 1.15
+    digital_maturity: 0.90
+    tv_dominance: 0.65
+    seasonality_type: standard
+    base_sales: 920000
+    currency: EUR
+
+  UK:
+    name: "United Kingdom"
+    gdp_index: 1.10
+    digital_maturity: 0.95
+    tv_dominance: 0.60
+    seasonality_type: mild
+    base_sales: 880000
+    currency: GBP
+
+  IT:
+    name: "Italy"
+    gdp_index: 0.85
+    digital_maturity: 0.75
+    tv_dominance: 0.75
+    seasonality_type: mediterranean
+    base_sales: 680000
+    currency: EUR
+
+  ES:
+    name: "Spain"
+    gdp_index: 0.80
+    digital_maturity: 0.78
+    tv_dominance: 0.72
+    seasonality_type: mediterranean
+    base_sales: 620000
+    currency: EUR
+
+  NL:
+    name: "Netherlands"
+    gdp_index: 1.25
+    digital_maturity: 0.98
+    tv_dominance: 0.50
+    seasonality_type: standard
+    base_sales: 540000
+    currency: EUR
+
+  BE:
+    name: "Belgium"
+    gdp_index: 1.05
+    digital_maturity: 0.88
+    tv_dominance: 0.68
+    seasonality_type: standard
+    base_sales: 480000
+    currency: EUR
+
+  PL:
+    name: "Poland"
+    gdp_index: 0.65
+    digital_maturity: 0.82
+    tv_dominance: 0.78
+    seasonality_type: eastern
+    base_sales: 390000
+    currency: PLN
+
+  SE:
+    name: "Sweden"
+    gdp_index: 1.30
+    digital_maturity: 0.99
+    tv_dominance: 0.45
+    seasonality_type: nordic
+    base_sales: 510000
+    currency: SEK
+
+  NO:
+    name: "Norway"
+    gdp_index: 1.50
+    digital_maturity: 0.97
+    tv_dominance: 0.48
+    seasonality_type: nordic
+    base_sales: 490000
+    currency: NOK
