@@ -1,0 +1,110 @@
+name: MMM Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'   # Chaque lundi à 6h UTC
+  workflow_dispatch:       # Déclenchement manuel depuis GitHub
+
+jobs:
+  mmm_pipeline:
+    name: MMM · Validate & Train
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Python ────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # ── 3. Install dependencies ───────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn matplotlib seaborn joblib pyyaml pytest
+
+      # ── 4. Generate synthetic data ────────────────────────────────────
+      - name: Generate synthetic data
+        run: python src/data/multi_market_generator.py
+
+      # ── 5. Validate data ──────────────────────────────────────────────
+      - name: Validate data (33 tests)
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          import pandas as pd
+          from src.data.data_validator import validate
+          df = pd.read_csv('data/synthetic/mmm_multi_market.csv', parse_dates=['date'])
+          report = validate(df)
+          report.print_summary()
+          assert report.n_errors == 0, f'Validation failed: {report.n_errors} error(s)'
+          print(f' All {report.n_tests} validation tests passed')
+          "
+
+      # ── 6. Run unit tests ─────────────────────────────────────────────
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short
+
+      # ── 7. Train models (OLS fallback, no PyMC) ───────────────────────
+      - name: Train models — all markets
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          import pandas as pd
+          import json
+          from src.data.data_loader import load_market_data, split_train_test
+          from src.models.bayesian_mmm import BayesianMMM
+          from src.evaluation.metrics import compute_all_metrics
+
+          ALL_MARKETS = ['FR','DE','UK','IT','ES','NL','BE','PL','SE','NO']
+          results = []
+          for market in ALL_MARKETS:
+              df = load_market_data(market)
+              df_train, df_test = split_train_test(df, test_ratio=0.2)
+              model = BayesianMMM(market=market)
+              model.fit(df_train, draws=100, tune=100, chains=2, random_seed=42)
+              y_pred = model.predict(df_test)
+              m = compute_all_metrics(df_test['revenue'].values, y_pred)
+              results.append({'market': market, 'r2': round(m['r2'],3), 'mape': round(m['mape'],2)})
+              print(f'{market} → R²={m[\"r2\"]:.3f} | MAPE={m[\"mape\"]:.1f}%')
+
+          import os
+          os.makedirs('results/reports', exist_ok=True)
+          with open('results/reports/ci_metrics.json', 'w') as f:
+              json.dump(results, f, indent=2)
+          print(' All markets trained successfully')
+          "
+
+      # ── 8. Check model quality ────────────────────────────────────────
+      - name: Check model quality thresholds
+        run: |
+          python -c "
+          import json
+          with open('results/reports/ci_metrics.json') as f:
+              results = json.load(f)
+          failed = [r for r in results if r['mape'] > 20]
+          if failed:
+              print('  Markets with MAPE > 20%:')
+              for r in failed: print(f'  {r[\"market\"]}: MAPE={r[\"mape\"]}%')
+          avg_r2   = sum(r['r2']   for r in results) / len(results)
+          avg_mape = sum(r['mape'] for r in results) / len(results)
+          print(f' Avg R²={avg_r2:.3f} | Avg MAPE={avg_mape:.1f}%')
+          "
+
+      # ── 9. Upload metrics artifact ────────────────────────────────────
+      - name: Upload metrics report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmm-metrics-${{ github.run_number }}
+          path: results/reports/ci_metrics.json
+          retention-days: 30

@@ -1,3 +1,5 @@
+![MMM Pipeline](https://github.com/Samir-AISS/Mmm-multi-market-bayesian/actions/workflows/mmm_pipeline.yml/badge.svg)
+
 # 🎯 MMM Multi-Market Bayesian
 
 **Marketing Mix Modeling for Multi-Market Analysis using Bayesian Inference**
