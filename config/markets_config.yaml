@@ -1,94 +1,163 @@
 # markets_config.yaml
 # -------------------
-# Paramètres spécifiques par marché
+# Paramètres spécifiques par marché européen
+# Utilisés pour la génération des données et la configuration du modèle
 
 markets:
+
   FR:
-    name: "France"
-    gdp_index: 1.00
-    digital_maturity: 0.85
-    tv_dominance: 0.70
-    seasonality_type: standard
-    base_sales: 850000
-    currency: EUR
+    name:              "France"
+    language:          "fr"
+    currency:          "EUR"
+    gdp_index:         1.00       # base de référence
+    digital_maturity:  0.85       # 0 = peu digital, 1 = très digital
+    tv_dominance:      0.70       # part de TV dans le mix media
+    seasonality_type:  "standard" # standard | mediterranean | nordic | eastern | mild
+    base_revenue:      500000     # revenue hebdomadaire de base (€)
+    trend_annual:      1.020      # croissance annuelle (+2%)
+    budget_weekly:     75000      # budget marketing hebdomadaire (€)
+    population_m:      68.0       # population (millions)
 
   DE:
-    name: "Germany"
-    gdp_index: 1.15
-    digital_maturity: 0.90
-    tv_dominance: 0.65
-    seasonality_type: standard
-    base_sales: 920000
-    currency: EUR
+    name:              "Germany"
+    language:          "de"
+    currency:          "EUR"
+    gdp_index:         1.15
+    digital_maturity:  0.90
+    tv_dominance:      0.65
+    seasonality_type:  "standard"
+    base_revenue:      620000
+    trend_annual:      1.015
+    budget_weekly:     93000
+    population_m:      84.0
 
   UK:
-    name: "United Kingdom"
-    gdp_index: 1.10
-    digital_maturity: 0.95
-    tv_dominance: 0.60
-    seasonality_type: mild
-    base_sales: 880000
-    currency: GBP
+    name:              "United Kingdom"
+    language:          "en"
+    currency:          "GBP"
+    gdp_index:         1.10
+    digital_maturity:  0.95
+    tv_dominance:      0.60
+    seasonality_type:  "mild"
+    base_revenue:      580000
+    trend_annual:      1.025
+    budget_weekly:     87000
+    population_m:      67.0
 
   IT:
-    name: "Italy"
-    gdp_index: 0.85
-    digital_maturity: 0.75
-    tv_dominance: 0.75
-    seasonality_type: mediterranean
-    base_sales: 680000
-    currency: EUR
+    name:              "Italy"
+    language:          "it"
+    currency:          "EUR"
+    gdp_index:         0.85
+    digital_maturity:  0.75
+    tv_dominance:      0.75
+    seasonality_type:  "mediterranean"
+    base_revenue:      430000
+    trend_annual:      1.010
+    budget_weekly:     64500
+    population_m:      60.0
 
   ES:
-    name: "Spain"
-    gdp_index: 0.80
-    digital_maturity: 0.78
-    tv_dominance: 0.72
-    seasonality_type: mediterranean
-    base_sales: 620000
-    currency: EUR
+    name:              "Spain"
+    language:          "es"
+    currency:          "EUR"
+    gdp_index:         0.80
+    digital_maturity:  0.78
+    tv_dominance:      0.72
+    seasonality_type:  "mediterranean"
+    base_revenue:      390000
+    trend_annual:      1.018
+    budget_weekly:     58500
+    population_m:      47.0
 
   NL:
-    name: "Netherlands"
-    gdp_index: 1.25
-    digital_maturity: 0.98
-    tv_dominance: 0.50
-    seasonality_type: standard
-    base_sales: 540000
-    currency: EUR
+    name:              "Netherlands"
+    language:          "nl"
+    currency:          "EUR"
+    gdp_index:         1.25
+    digital_maturity:  0.98
+    tv_dominance:      0.50
+    seasonality_type:  "mild"
+    base_revenue:      340000
+    trend_annual:      1.022
+    budget_weekly:     51000
+    population_m:      17.9
 
   BE:
-    name: "Belgium"
-    gdp_index: 1.05
-    digital_maturity: 0.88
-    tv_dominance: 0.68
-    seasonality_type: standard
-    base_sales: 480000
-    currency: EUR
+    name:              "Belgium"
+    language:          "fr/nl"
+    currency:          "EUR"
+    gdp_index:         1.05
+    digital_maturity:  0.88
+    tv_dominance:      0.68
+    seasonality_type:  "standard"
+    base_revenue:      310000
+    trend_annual:      1.012
+    budget_weekly:     46500
+    population_m:      11.6
 
   PL:
-    name: "Poland"
-    gdp_index: 0.65
-    digital_maturity: 0.82
-    tv_dominance: 0.78
-    seasonality_type: eastern
-    base_sales: 390000
-    currency: PLN
+    name:              "Poland"
+    language:          "pl"
+    currency:          "PLN"
+    gdp_index:         0.65
+    digital_maturity:  0.82
+    tv_dominance:      0.78
+    seasonality_type:  "eastern"
+    base_revenue:      280000
+    trend_annual:      1.035      # forte croissance (+3.5%)
+    budget_weekly:     42000
+    population_m:      38.0
 
   SE:
-    name: "Sweden"
-    gdp_index: 1.30
-    digital_maturity: 0.99
-    tv_dominance: 0.45
-    seasonality_type: nordic
-    base_sales: 510000
-    currency: SEK
+    name:              "Sweden"
+    language:          "sv"
+    currency:          "SEK"
+    gdp_index:         1.30
+    digital_maturity:  0.99
+    tv_dominance:      0.45       # très peu de TV, digital dominant
+    seasonality_type:  "nordic"
+    base_revenue:      360000
+    trend_annual:      1.020
+    budget_weekly:     54000
+    population_m:      10.5
 
   NO:
-    name: "Norway"
-    gdp_index: 1.50
-    digital_maturity: 0.97
-    tv_dominance: 0.48
-    seasonality_type: nordic
-    base_sales: 490000
-    currency: NOK
+    name:              "Norway"
+    language:          "no"
+    currency:          "NOK"
+    gdp_index:         1.50       # PIB/hab le plus élevé du panel
+    digital_maturity:  0.97
+    tv_dominance:      0.48
+    seasonality_type:  "nordic"
+    base_revenue:      380000
+    trend_annual:      1.018
+    budget_weekly:     57000
+    population_m:      5.4
+
+# ── Types de saisonnalité ─────────────────────────────────────────────────────
+seasonality_types:
+  standard:
+    description: "Pic en Q4 (Noël), creux en été"
+    amplitude:   0.25
+    phase_shift: -1.57   # -π/2
+
+  mediterranean:
+    description: "Pic en été (tourisme), fort Q4"
+    amplitude:   0.30
+    phase_shift: -1.05
+
+  nordic:
+    description: "Pic très marqué en Q4, creux profond en été"
+    amplitude:   0.35
+    phase_shift: -1.88
+
+  eastern:
+    description: "Double pic : Q1 (Pâques) + Q4 (Noël)"
+    amplitude:   0.28
+    phase_shift: -1.26
+
+  mild:
+    description: "Saisonnalité atténuée — marché mature"
+    amplitude:   0.15
+    phase_shift: -1.57

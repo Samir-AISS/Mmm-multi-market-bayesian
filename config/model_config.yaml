@@ -1,43 +1,110 @@
 # model_config.yaml
 # ------------------
-# Hyperparamètres du modèle MMM bayésien
+# Hyperparamètres du modèle MMM bayésien multi-marchés
+# Référence : Jin et al. (2017), PyMC-Marketing
 
 model:
   name: "mmm_multi_market_bayesian"
   version: "1.0.0"
+  author: "Samir EL AISSAOUY"
+  description: "Bayesian MMM with adstock + Hill saturation — 10 European markets"
 
+# ── Colonnes ──────────────────────────────────────────────────────────────────
+data:
+  target_column:  "revenue"
+  date_column:    "date"
+  market_column:  "market"
+  week_column:    "week"
+  spend_columns:
+    - "tv_spend"
+    - "facebook_spend"
+    - "search_spend"
+    - "ooh_spend"
+    - "print_spend"
+  control_columns:
+    - "seasonality"
+    - "trend"
+    - "events"
+    - "promotions"
+    - "competitor_price"
+
+# ── Sampling MCMC ─────────────────────────────────────────────────────────────
 inference:
-  draws: 1000
-  tune: 1000
-  chains: 4
-  target_accept: 0.9
-  random_seed: 42
+  draws:          1000    # échantillons par chaîne
+  tune:           1000    # warmup (burn-in)
+  chains:         4       # chaînes parallèles
+  target_accept:  0.90    # taux d'acceptation NUTS
+  random_seed:    42      # reproductibilité
+  progressbar:    true
 
+# ── Canaux marketing ──────────────────────────────────────────────────────────
 channels:
-  - name: tv
-    adstock_type: geometric       # geometric | delayed
-    saturation_type: hill         # hill | logistic
-    decay_prior: [0.3, 0.7]       # [min, max] pour prior uniform
-    
-  - name: facebook
-    adstock_type: geometric
-    saturation_type: hill
-    decay_prior: [0.1, 0.5]
-    
-  - name: search
-    adstock_type: geometric
-    saturation_type: hill
-    decay_prior: [0.0, 0.3]
-    
-  - name: ooh
-    adstock_type: geometric
-    saturation_type: hill
-    decay_prior: [0.2, 0.6]
-    
-  - name: print
-    adstock_type: geometric
-    saturation_type: hill
-    decay_prior: [0.1, 0.4]
+  tv:
+    adstock_type:     geometric
+    saturation_type:  hill
+    decay:            0.60        # valeur initiale
+    decay_prior:      [0.3, 0.7]  # plage prior
+    hill_S:           2.0
+    beta_prior_sigma: 1.0
+    description:      "Télévision — long carryover"
 
-target: revenue
-date_column: date
+  facebook:
+    adstock_type:     geometric
+    saturation_type:  hill
+    decay:            0.30
+    decay_prior:      [0.1, 0.5]
+    hill_S:           2.0
+    beta_prior_sigma: 1.0
+    description:      "Facebook/Meta Ads — carryover moyen"
+
+  search:
+    adstock_type:     geometric
+    saturation_type:  hill
+    decay:            0.15
+    decay_prior:      [0.0, 0.3]
+    hill_S:           1.5
+    beta_prior_sigma: 1.0
+    description:      "Search (Google/Bing) — faible carryover, intent-driven"
+
+  ooh:
+    adstock_type:     geometric
+    saturation_type:  hill
+    decay:            0.45
+    decay_prior:      [0.2, 0.6]
+    hill_S:           2.0
+    beta_prior_sigma: 1.0
+    description:      "Out-Of-Home (affichage) — carryover moyen"
+
+  print:
+    adstock_type:     geometric
+    saturation_type:  hill
+    decay:            0.25
+    decay_prior:      [0.1, 0.4]
+    hill_S:           1.5
+    beta_prior_sigma: 1.0
+    description:      "Print (presse) — faible carryover"
+
+# ── Diagnostics de convergence ────────────────────────────────────────────────
+diagnostics:
+  rhat_threshold:   1.01   # R-hat Gelman-Rubin
+  ess_min:          400    # Effective Sample Size minimum
+  max_divergences:  0      # Aucune divergence tolérée
+
+# ── Métriques cibles ──────────────────────────────────────────────────────────
+performance_targets:
+  r2_min:     0.85    # R² minimum acceptable
+  mape_max:   15.0    # MAPE maximum (%)
+  nrmse_max:  0.15    # NRMSE maximum
+
+# ── Hyperparameter tuning ─────────────────────────────────────────────────────
+tuning:
+  fast_mode:    true    # grille réduite pour aller plus vite
+  val_ratio:    0.20    # proportion validation
+  metric:       "r2"    # métrique de sélection
+  min_r2:       0.70    # R² minimum pour considérer une config valide
+
+# ── Sauvegarde ────────────────────────────────────────────────────────────────
+output:
+  models_dir:   "results/models"
+  reports_dir:  "results/reports"
+  format:       "netcdf"   # format idata (arviz)

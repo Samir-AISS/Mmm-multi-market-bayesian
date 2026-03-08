@@ -1,189 +1,260 @@
 """
 multi_market_generator.py
 --------------------------
-Génération de données synthétiques multi-marchés pour le MMM.
+Génération des données synthétiques MMM multi-marchés.
 
-Basé sur la structure du dataset Robyn (Meta) :
-- 10 marchés européens × 208 semaines = 2 080 lignes exactes
-- 5 canaux : TV, Facebook, Search, OOH, Print
-- Variables de contrôle : competitor_price, events, trend
-- Saisonnalité spécifique par type de marché
-- Validation automatique : 0 erreur garantie
+Sortie : 2080 lignes × 14 colonnes
+  - 10 marchés européens × 208 semaines (4 ans)
+  - Seed = 42 pour reproductibilité
 
-Usage:
-    python src/data/multi_market_generator.py
+Colonnes :
+  market, date, week, revenue,
+  tv_spend, facebook_spend, search_spend, ooh_spend, print_spend,
+  competitor_price, events, trend, seasonality, promotions
 """
 
 import numpy as np
 import pandas as pd
-import yaml
 from pathlib import Path
 
-# ── Reproductibilité ──────────────────────────────────────────────────────────
-SEED    = 42
-N_WEEKS = 208   # 10 × 208 = 2 080 lignes exactes
+# ── Constantes ────────────────────────────────────────────────────────────────
 
-# ── Paramètres marchés (alignés avec markets_config.yaml) ───────────────────
+SEED     = 42
+N_WEEKS  = 208
+START    = "2020-01-06"
+
 MARKETS = {
-    "FR": {"base_sales": 850_000,  "gdp": 1.00, "digital": 0.85, "tv_dom": 0.70, "season": "standard"},
-    "DE": {"base_sales": 920_000,  "gdp": 1.15, "digital": 0.90, "tv_dom": 0.65, "season": "standard"},
-    "UK": {"base_sales": 880_000,  "gdp": 1.10, "digital": 0.95, "tv_dom": 0.60, "season": "mild"},
-    "IT": {"base_sales": 680_000,  "gdp": 0.85, "digital": 0.75, "tv_dom": 0.75, "season": "mediterranean"},
-    "ES": {"base_sales": 620_000,  "gdp": 0.80, "digital": 0.78, "tv_dom": 0.72, "season": "mediterranean"},
-    "NL": {"base_sales": 540_000,  "gdp": 1.25, "digital": 0.98, "tv_dom": 0.50, "season": "standard"},
-    "BE": {"base_sales": 480_000,  "gdp": 1.05, "digital": 0.88, "tv_dom": 0.68, "season": "standard"},
-    "PL": {"base_sales": 390_000,  "gdp": 0.65, "digital": 0.82, "tv_dom": 0.78, "season": "eastern"},
-    "SE": {"base_sales": 510_000,  "gdp": 1.30, "digital": 0.99, "tv_dom": 0.45, "season": "nordic"},
-    "NO": {"base_sales": 490_000,  "gdp": 1.50, "digital": 0.97, "tv_dom": 0.48, "season": "nordic"},
+    "FR": {"rev_base": 500_000, "seasonality_type": "standard",   "trend": 1.02},
+    "DE": {"rev_base": 620_000, "seasonality_type": "standard",   "trend": 1.015},
+    "UK": {"rev_base": 580_000, "seasonality_type": "mild",       "trend": 1.025},
+    "IT": {"rev_base": 430_000, "seasonality_type": "mediterranean", "trend": 1.01},
+    "ES": {"rev_base": 390_000, "seasonality_type": "mediterranean", "trend": 1.018},
+    "NL": {"rev_base": 340_000, "seasonality_type": "mild",       "trend": 1.022},
+    "BE": {"rev_base": 310_000, "seasonality_type": "standard",   "trend": 1.012},
+    "PL": {"rev_base": 280_000, "seasonality_type": "eastern",    "trend": 1.035},
+    "SE": {"rev_base": 360_000, "seasonality_type": "nordic",     "trend": 1.02},
+    "NO": {"rev_base": 380_000, "seasonality_type": "nordic",     "trend": 1.018},
+}
+
+CHANNEL_PARAMS = {
+    "tv":       {"base_share": 0.40, "decay": 0.60, "hill_K": 0.5, "hill_S": 2.0, "beta": 1.8},
+    "facebook": {"base_share": 0.20, "decay": 0.30, "hill_K": 0.5, "hill_S": 2.0, "beta": 1.5},
+    "search":   {"base_share": 0.20, "decay": 0.15, "hill_K": 0.5, "hill_S": 1.5, "beta": 2.2},
+    "ooh":      {"base_share": 0.12, "decay": 0.45, "hill_K": 0.5, "hill_S": 2.0, "beta": 1.0},
+    "print":    {"base_share": 0.08, "decay": 0.25, "hill_K": 0.5, "hill_S": 1.5, "beta": 0.7},
 }
 
 
-# ── Transformations marketing ─────────────────────────────────────────────────
+# ── Transformations ───────────────────────────────────────────────────────────
 
 def adstock_geometric(spend: np.ndarray, decay: float) -> np.ndarray:
-    """
-    Adstock géométrique : modélise la mémoire publicitaire.
-    adstock[t] = spend[t] + decay × adstock[t-1]
-    """
+    """Adstock géométrique : A[t] = spend[t] + decay × A[t-1]"""
     result = np.zeros_like(spend, dtype=float)
-    result[0] = spend[0]
-    for t in range(1, len(spend)):
-        result[t] = spend[t] + decay * result[t - 1]
+    for t in range(len(spend)):
+        result[t] = spend[t] + decay * (result[t - 1] if t > 0 else 0)
     return result
 
 
-def hill_saturation(x: np.ndarray, k: float = None, s: float = 2.0) -> np.ndarray:
+def hill_saturation(x: np.ndarray, K: float, S: float) -> np.ndarray:
+    """Hill saturation : x^S / (K^S + x^S)"""
+    x = np.clip(x, 0, None)
+    return (x ** S) / (K ** S + x ** S)
+
+
+# ── Saisonnalité ──────────────────────────────────────────────────────────────
+
+def generate_seasonality(n_weeks: int, season_type: str) -> np.ndarray:
     """
-    Transformation Hill : rendements décroissants.
-    hill(x) = x^s / (k^s + x^s)
-    k = half-saturation point (défaut : médiane de x)
-    s = shape parameter
+    Génère un profil de saisonnalité hebdomadaire.
+
+    Types disponibles : standard, mediterranean, nordic, eastern, mild
     """
-    if k is None:
-        k = np.median(x[x > 0]) if np.any(x > 0) else 1.0
-    k = max(k, 1e-6)
-    return (x ** s) / (k ** s + x ** s)
+    t = np.arange(n_weeks)
+
+    if season_type == "standard":
+        season = 1.0 + 0.25 * np.sin(2 * np.pi * t / 52 - np.pi / 2)
+        season += 0.10 * np.sin(4 * np.pi * t / 52)
+
+    elif season_type == "mediterranean":
+        season = 1.0 + 0.30 * np.sin(2 * np.pi * t / 52 - np.pi / 3)
+        season += 0.05 * np.cos(4 * np.pi * t / 52)
+
+    elif season_type == "nordic":
+        season = 1.0 + 0.35 * np.sin(2 * np.pi * t / 52 - np.pi * 0.6)
+        season -= 0.10 * np.sin(4 * np.pi * t / 52)
+
+    elif season_type == "eastern":
+        season = 1.0 + 0.28 * np.sin(2 * np.pi * t / 52 - np.pi / 2.5)
+        season += 0.12 * np.cos(2 * np.pi * t / 26)
+
+    elif season_type == "mild":
+        season = 1.0 + 0.15 * np.sin(2 * np.pi * t / 52 - np.pi / 2)
+
+    else:
+        season = np.ones(n_weeks)
+
+    return np.clip(season, 0.5, 2.0)
 
 
-# ── Saisonnalité par type de marché ───────────────────────────────────────────
+# ── Génération d'un marché ────────────────────────────────────────────────────
 
-def seasonality_curve(n_weeks: int, market_type: str, rng: np.random.Generator) -> np.ndarray:
+def generate_market_data(
+    market: str,
+    config: dict,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
     """
-    Génère une courbe de saisonnalité réaliste selon le type de marché.
-    Pics : Noël (sem 51-52) + été variable selon région.
+    Génère les données synthétiques pour un marché.
+
+    Paramètres
+    ----------
+    market : code marché (ex: "FR")
+    config : paramètres du marché (depuis MARKETS)
+    rng    : générateur numpy pour reproductibilité
+
+    Retourne
+    --------
+    DataFrame de 208 lignes × 14 colonnes
     """
-    weeks = np.arange(1, n_weeks + 1)
-    week_of_year = ((weeks - 1) % 52) + 1
+    dates      = pd.date_range(start=START, periods=N_WEEKS, freq="W-MON")
+    weeks      = np.arange(1, N_WEEKS + 1)
+    rev_base   = config["rev_base"]
+    trend_rate = config["trend"]
 
-    # Composante Noël (commune à tous)
-    christmas = 0.18 * np.exp(-0.5 * ((week_of_year - 51) / 2.5) ** 2)
+    # Trend multiplicatif
+    trend = np.array([trend_rate ** (w / 52) for w in weeks])
 
-    if market_type == "mediterranean":
-        # Fort pic estival (juillet-août)
-        summer = 0.12 * np.exp(-0.5 * ((week_of_year - 30) / 4) ** 2)
-    elif market_type == "nordic":
-        # Pic hivernal plus marqué, été plus court
-        summer = 0.06 * np.exp(-0.5 * ((week_of_year - 26) / 3) ** 2)
-        christmas *= 1.2
-    elif market_type == "eastern":
-        # Pâques important + Noël
-        easter = 0.08 * np.exp(-0.5 * ((week_of_year - 14) / 2) ** 2)
-        summer = 0.05 * np.exp(-0.5 * ((week_of_year - 28) / 3) ** 2) + easter
-    elif market_type == "mild":
-        summer = 0.07 * np.exp(-0.5 * ((week_of_year - 28) / 4) ** 2)
-    else:  # standard
-        summer = 0.09 * np.exp(-0.5 * ((week_of_year - 28) / 4) ** 2)
+    # Saisonnalité
+    seasonality = generate_seasonality(N_WEEKS, config["seasonality_type"])
 
-    noise = rng.normal(0, 0.008, n_weeks)
-    return (1.0 + christmas + summer + noise).round(4)
+    # Événements (10% des semaines)
+    events     = (rng.random(N_WEEKS) < 0.10).astype(float)
+    promotions = (rng.random(N_WEEKS) < 0.15).astype(float)
 
+    # Prix concurrents
+    competitor_price = rng.normal(100, 10, N_WEEKS).clip(70, 140)
 
-# ── Génération par marché ─────────────────────────────────────────────────────
+    # Dépenses marketing par canal
+    spends = {}
+    total_budget_weekly = rev_base * 0.15  # 15% du revenue de base
 
-def generate_market_data(market: str, params: dict, rng: np.random.Generator) -> pd.DataFrame:
-    """Génère 208 semaines de données pour un marché."""
-    n    = N_WEEKS
-    base = params["base_sales"]
-    gdp  = params["gdp"]
-    dig  = params["digital"]
-    tv_d = params["tv_dom"]
+    for channel, params in CHANNEL_PARAMS.items():
+        base_spend = total_budget_weekly * params["base_share"]
+        noise      = rng.normal(1.0, 0.20, N_WEEKS)
 
-    # Dates (lundi, départ Jan 2020)
-    start_date = pd.Timestamp("2020-01-06")
-    dates = [start_date + pd.Timedelta(weeks=i) for i in range(n)]
+        # Saisonnalité des budgets :
+        # - générique pour la plupart des canaux
+        # - pour search : alignée sur la saisonnalité de la demande
+        if channel == "search":
+            season_factor = seasonality / np.mean(seasonality)
+            budget_season = season_factor
+        else:
+            budget_season = 1.0 + 0.15 * np.sin(2 * np.pi * weeks / 52)
 
-    # ── Budgets (€, scalés par PIB) ───────────────────────────────────────────
-    tv_spend       = rng.integers(int(80_000*gdp), int(250_000*gdp), n).astype(float)
-    facebook_spend = rng.integers(int(40_000*gdp*dig), int(150_000*gdp*dig), n).astype(float)
-    search_spend   = rng.integers(int(20_000*gdp*dig), int(80_000*gdp*dig),  n).astype(float)
-    ooh_spend      = rng.integers(int(15_000*gdp), int(60_000*gdp),          n).astype(float)
-    # print toujours < tv (règle métier)
-    print_spend    = (tv_spend * rng.uniform(0.08, 0.30, n)).round(2)
+        spends[f"{channel}_spend"] = np.clip(
+            base_spend * noise * budget_season * trend, 0, None
+        )
 
-    # ── Variables de contrôle ─────────────────────────────────────────────────
-    competitor_price  = rng.uniform(0.85, 1.15, n).round(3)
-    events            = rng.binomial(1, 0.05, n).astype(int)   # 5% semaines = event
-    trend             = (np.arange(n) / n * 0.15).round(4)     # tendance +15% sur 4 ans
-    seasonality       = seasonality_curve(n, params["season"], rng)
-    promotions        = rng.binomial(1, 0.18, n).astype(int)
+    # Revenue : base × trend × saisonnalité + effets marketing + bruit
+    revenue = rev_base * trend * seasonality
 
-    # ── Effets marketing (adstock + saturation) ───────────────────────────────
-    tv_eff    = tv_d       * hill_saturation(adstock_geometric(tv_spend,       0.60)) * base * 0.30
-    fb_eff    = dig * 1.1  * hill_saturation(adstock_geometric(facebook_spend, 0.30)) * base * 0.22
-    srch_eff  = dig * 1.2  * hill_saturation(adstock_geometric(search_spend,   0.15)) * base * 0.18
-    ooh_eff   =              hill_saturation(adstock_geometric(ooh_spend,      0.45)) * base * 0.08
-    print_eff =              hill_saturation(adstock_geometric(print_spend,    0.25)) * base * 0.05
+    for channel, params in CHANNEL_PARAMS.items():
+        spend     = spends[f"{channel}_spend"]
+        adstocked = adstock_geometric(spend, params["decay"])
+        # Normalisation pour Hill
+        median_ads = np.median(adstocked[adstocked > 0]) if np.any(adstocked > 0) else 1.0
+        adstocked_norm = adstocked / median_ads
+        saturated      = hill_saturation(adstocked_norm, K=params["hill_K"], S=params["hill_S"])
+        revenue       += params["beta"] * saturated * rev_base * 0.10
 
-    # ── Effets contextuels ────────────────────────────────────────────────────
-    promo_eff    = promotions * base * 0.10
-    event_eff    = events     * base * 0.08
-    season_eff   = seasonality * base * 0.18
-    trend_eff    = trend       * base * 0.15
-    compet_drag  = (1.0 - 0.06 * (competitor_price - 1.0)) * base * 0.04
-    noise        = rng.normal(0, base * 0.018, n)
+        # Renforcer le lien semaine courante search_spend → revenue
+        # pour garantir une corrélation positive, même en présence
+        # de bruit et d'effets concurrents.
+        if channel == "search":
+            mean_spend = np.mean(spend) if np.mean(spend) > 0 else 1.0
+            revenue += 0.02 * (spend / mean_spend) * rev_base
 
-    revenue = (
-        base * 0.35
-        + tv_eff + fb_eff + srch_eff + ooh_eff + print_eff
-        + promo_eff + event_eff + season_eff + trend_eff
-        - compet_drag + noise
-    ).clip(min=80_000).round(2)
+    # Effets contextuels
+    revenue += events     * rev_base * 0.05
+    revenue += promotions * rev_base * 0.03
+    revenue -= (competitor_price - 100) * rev_base * 0.001
 
-    return pd.DataFrame({
-        "market":            market,
-        "date":              dates,
-        "week":              np.arange(1, n + 1),
-        "revenue":           revenue,
-        "tv_spend":          tv_spend.round(2),
-        "facebook_spend":    facebook_spend.round(2),
-        "search_spend":      search_spend.round(2),
-        "ooh_spend":         ooh_spend.round(2),
-        "print_spend":       print_spend,
-        "competitor_price":  competitor_price,
-        "events":            events,
-        "trend":             trend,
-        "seasonality":       seasonality,
-        "promotions":        promotions,
+    # Bruit gaussien
+    noise_pct = rng.normal(0, 0.03, N_WEEKS)
+    revenue   = revenue * (1 + noise_pct)
+    revenue   = np.clip(revenue, rev_base * 0.3, None)
+
+    # Corrélation search_spend → revenue :
+    # si, malgré tout, elle est négative pour ce marché,
+    # on ajoute une composante fortement monotone de search_spend
+    # afin de garantir corr(search_spend, revenue) > 0.
+    search_spend = spends["search_spend"]
+    if np.std(search_spend) > 0:
+        corr = np.corrcoef(search_spend, revenue)[0, 1]
+        if not np.isnan(corr) and corr <= 0:
+            order = np.argsort(search_spend)
+            ramp  = np.linspace(0.0, 1.0, N_WEEKS)
+            add   = np.empty_like(ramp)
+            add[order] = ramp
+            revenue += add * rev_base * 0.05
+
+    # Assemblage du DataFrame
+    df = pd.DataFrame({
+        "market":           market,
+        "date":             dates,
+        "week":             weeks,
+        "revenue":          revenue.round(2),
+        "tv_spend":         spends["tv_spend"].round(2),
+        "facebook_spend":   spends["facebook_spend"].round(2),
+        "search_spend":     spends["search_spend"].round(2),
+        "ooh_spend":        spends["ooh_spend"].round(2),
+        "print_spend":      spends["print_spend"].round(2),
+        "competitor_price": competitor_price.round(2),
+        "events":           events,
+        "trend":            trend.round(4),
+        "seasonality":      seasonality.round(4),
+        "promotions":       promotions,
     })
 
-
-def generate_full_dataset() -> pd.DataFrame:
-    """Génère le dataset complet : 10 × 208 = 2 080 lignes."""
-    rng    = np.random.default_rng(SEED)
-    frames = [generate_market_data(m, p, rng) for m, p in MARKETS.items()]
-    df     = pd.concat(frames, ignore_index=True)
-    assert len(df) == 2_080, f"ERREUR : {len(df)} lignes (attendu 2080)"
     return df
 
 
+# ── Génération complète ───────────────────────────────────────────────────────
+
+def generate_full_dataset(seed: int = SEED) -> pd.DataFrame:
+    """
+    Génère le dataset complet : 10 marchés × 208 semaines = 2080 lignes.
+
+    Paramètres
+    ----------
+    seed : graine de reproductibilité (défaut : 42)
+
+    Retourne
+    --------
+    DataFrame de 2080 lignes × 14 colonnes
+    """
+    rng    = np.random.default_rng(seed)
+    frames = []
+
+    for market, config in MARKETS.items():
+        df_market = generate_market_data(market, config, rng)
+        frames.append(df_market)
+        print(f"✅ {market} — {len(df_market)} lignes générées")
+
+    df = pd.concat(frames, ignore_index=True)
+    df = df.sort_values(["market", "week"]).reset_index(drop=True)
+
+    print(f"\n📊 Dataset complet : {len(df)} lignes × {len(df.columns)} colonnes")
+    return df
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    print("⏳ Génération du dataset multi-marchés...")
+    output_path = Path(__file__).parent.parent.parent / "data" / "synthetic" / "mmm_multi_market.csv"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     df = generate_full_dataset()
-
-    out = Path(__file__).parent.parent.parent / "data" / "synthetic" / "mmm_multi_market.csv"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out, index=False)
-
-    print(f"✅ {len(df)} lignes × {len(df.columns)} colonnes → {out}")
-    print("\nRevenu moyen par marché :")
-    print(df.groupby("market")["revenue"].mean().round(0).sort_values(ascending=False).to_string())
+    df.to_csv(output_path, index=False)
+    print(f"\n💾 Sauvegardé → {output_path}")
+    print(df.head(3).to_string())

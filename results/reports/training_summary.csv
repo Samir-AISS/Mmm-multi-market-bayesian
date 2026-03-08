@@ -1,0 +1,11 @@
+market,status,duration_s,error
+FR,failed,0.0,'revenue_norm'
+DE,failed,0.0,'revenue_norm'
+UK,failed,0.0,'revenue_norm'
+IT,failed,0.0,'revenue_norm'
+ES,failed,0.0,'revenue_norm'
+NL,failed,0.0,'revenue_norm'
+BE,failed,0.0,'revenue_norm'
+PL,failed,0.0,'revenue_norm'
+SE,failed,0.0,'revenue_norm'
+NO,failed,0.0,'revenue_norm'

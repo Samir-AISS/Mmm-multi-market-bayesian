@@ -1,36 +1,107 @@
 # priors.yaml
 # -----------
-# Distributions a priori pour le modèle bayésien
-# Basées sur la littérature MMM (Jin et al. 2017, Gelman 2020)
+# Distributions a priori pour le modèle MMM bayésien
+# Basées sur : Jin et al. (2017), Gelman (2020), PyMC-Marketing docs
+#
+# Philosophie : priors faiblement informatifs
+#   - Positifs pour les betas (HalfNormal)
+#   - Bornés [0,1] pour les decay (Beta)
+#   - Positifs avec forme pour Hill (Gamma)
 
+# ── Coefficients canaux ───────────────────────────────────────────────────────
 channel_coefficients:
-  distribution: HalfNormal
-  sigma: 1.0
-  description: "Prior faiblement informatif pour les betas"
+  distribution:  "HalfNormal"
+  sigma:         1.0
+  description:   >
+    Prior faiblement informatif pour les betas.
+    HalfNormal garantit la positivité (spend → revenue positif).
+    sigma=1 sur les données normalisées est raisonnablement vague.
 
+# ── Adstock decay ─────────────────────────────────────────────────────────────
 adstock_decay:
-  distribution: Beta
-  alpha: 2.0
-  beta: 2.0
-  description: "Prior centré sur 0.5, borné [0,1]"
+  distribution:  "Beta"
+  alpha:         2.0
+  beta:          2.0
+  description:   >
+    Prior centré sur 0.5, borné [0, 1].
+    Beta(2,2) est légèrement informatif — évite les valeurs extrêmes
+    (decay=0 ou decay=1) qui sont peu réalistes.
+  by_channel:
+    tv:       { alpha: 3.0, beta: 2.0 }   # centré ~0.6 (TV = long carryover)
+    facebook: { alpha: 2.0, beta: 3.0 }   # centré ~0.4
+    search:   { alpha: 1.5, beta: 4.0 }   # centré ~0.27 (Search = court)
+    ooh:      { alpha: 2.5, beta: 2.5 }   # centré ~0.5
+    print:    { alpha: 2.0, beta: 3.5 }   # centré ~0.36
 
-hill_k:  # half-saturation point
-  distribution: Gamma
-  alpha: 3.0
-  beta: 1.0
-  description: "Prior pour le point de demi-saturation"
+# ── Hill — half-saturation K ──────────────────────────────────────────────────
+hill_k:
+  distribution:  "Gamma"
+  alpha:         3.0
+  beta:          1.0
+  description:   >
+    Prior pour le point de demi-saturation K (données normalisées).
+    Gamma(3,1) → mode=2, moyenne=3.
+    Sur données normalisées (médiane=1), K~2-3 est raisonnable.
 
-hill_s:  # shape parameter
-  distribution: Gamma
-  alpha: 2.0
-  beta: 1.0
-  description: "Prior pour la forme de la courbe Hill"
+# ── Hill — shape S ────────────────────────────────────────────────────────────
+hill_s:
+  distribution:  "Gamma"
+  alpha:         2.0
+  beta:          1.0
+  description:   >
+    Prior pour la forme de la courbe Hill.
+    Gamma(2,1) → mode=1, moyenne=2.
+    S>1 → sigmoïdale (lente puis rapide puis plateau)
+    S<1 → concave (rendements décroissants dès le départ)
+    S=1 → hyperbolique (cas intermédiaire)
 
+# ── Base sales (intercept) ────────────────────────────────────────────────────
 base_sales:
-  distribution: Normal
-  description: "Prior sur les ventes de base (non-marketing)"
+  distribution:  "HalfNormal"
+  sigma:         1.0
+  description:   >
+    Prior sur les ventes de base (ventes sans marketing).
+    HalfNormal(1) sur données normalisées.
+    Garantit la positivité des ventes de base.
 
+# ── Effets de contrôle ────────────────────────────────────────────────────────
+control_effects:
+  seasonality:
+    distribution: "Normal"
+    mu:           0.5
+    sigma:        0.3
+    description:  "Effet saisonnalité — positif attendu"
+
+  trend:
+    distribution: "Normal"
+    mu:           0.3
+    sigma:        0.3
+    description:  "Effet tendance — légèrement positif"
+
+  events:
+    distribution: "Normal"
+    mu:           0.1
+    sigma:        0.2
+    description:  "Effet événements — faible et incertain"
+
+  promotions:
+    distribution: "Normal"
+    mu:           0.05
+    sigma:        0.15
+    description:  "Effet promotions — faible"
+
+# ── Bruit d'observation ───────────────────────────────────────────────────────
 noise:
-  distribution: HalfNormal
-  sigma: 0.5
-  description: "Prior sur l'écart-type du bruit"
+  distribution:  "HalfNormal"
+  sigma:         0.5
+  description:   >
+    Prior sur l'écart-type du bruit d'observation.
+    HalfNormal(0.5) sur données normalisées.
+    Permet ~10-20% de bruit résiduel — raisonnable pour données marketing.
+
+# ── Références ────────────────────────────────────────────────────────────────
+references:
+  - "Jin et al. (2017) — Bayesian Methods for Media Mix Modeling"
+  - "Gelman et al. (2020) — Regression and Other Stories"
+  - "PyMC-Marketing — https://www.pymc-marketing.io/en/latest/notebooks/mmm/mmm_example.html"
+  - "Stan Prior Choice Recommendations — https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations"
