@@ -3,7 +3,6 @@
 ![PyMC](https://img.shields.io/badge/PyMC-5.x-red?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-live-ff4b4b?logo=streamlit&logoColor=white)
 ![Prefect](https://img.shields.io/badge/Prefect-Cloud-blue?logo=prefect&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
 
 # Marketing Mix Modeling — Multi-Market Bayesian
 
