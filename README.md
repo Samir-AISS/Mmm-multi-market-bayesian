@@ -9,7 +9,7 @@
 
 A production-grade **Bayesian Marketing Mix Modeling** system analyzing marketing effectiveness across **10 European markets** and **5 channels**, inspired by Google Meridian and Meta Robyn.
 
-**[Live Dashboard](https://mmm-multi-market-bayesian-jccbmodavvizmjzlcddjhc.streamlit.app)** · [Methodology](docs/methodology.md) · [API Reference](docs/api_reference.md)
+**[Live Dashboard](https://mmm-multi-market-bayesian-aplu5nv4q3enzxifbgfexw.streamlit.app/)** · [Methodology](docs/methodology.md) · [API Reference](docs/api_reference.md)
 
 ---
 
